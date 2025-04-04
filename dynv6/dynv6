@@ -1,13 +1,3 @@
-#!/bin/bash
-
-# based on https://gist.github.com/corny/7a07f5ac901844bd20c9
-
-# This file can not have a file extension.
-# Cron run-parts will not run it if it has one.
-# See https://gist.github.com/andyshinn/3ae01fa13cb64c9d36e7
-
-# to use trap only in this function: sub-shell
-# See https://stackoverflow.com/a/23849360
 update_host()
 (
     trap return ERR
@@ -30,13 +20,14 @@ update_host()
         return 1
     fi
 
+    # Extract the IPv6 address without the subnet mask
+    current_ip_clean=${current_ip%/*}
+
     current_ip_file=/root/current_ip/${hostname}
     local old
     [ -e "$current_ip_file" ] && old="$(cat "$current_ip_file")"
 
-    #echo "old: $old, current_ip: $current_ip"
     if [ "$old" = "$current_ip" ]; then
-        #echo "IP address unchanged."
         return
     fi
 
@@ -45,9 +36,9 @@ update_host()
     if [ "$DYNV6_USE_AUTO" = "true" ]; then
         $bin "https://ipv6.dynv6.com/api/update?hostname=$hostname&token=$DYNV6_TOKEN&ipv6=auto&ipv6prefix=auto"
     else
-        # send addresses to dynv6
-        echo "$(date +"%Y-%m-%d %T"): Calling: $bin https://dynv6.com/api/update?hostname=$hostname&token=$DYNV6_TOKEN&ipv6=$current_ip"
-        $bin "https://dynv6.com/api/update?hostname=$hostname&token=$DYNV6_TOKEN&ipv6=$current_ip"
+        # Properly format the IPv6 address with square brackets for the URL
+        echo "$(date +"%Y-%m-%d %T"): Calling: $bin https://dynv6.com/api/update?hostname=$hostname&token=$DYNV6_TOKEN&ipv6=[$current_ip_clean]"
+        $bin "https://dynv6.com/api/update?hostname=$hostname&token=$DYNV6_TOKEN&ipv6=[$current_ip_clean]"
     fi
 
     # save current address
@@ -58,10 +49,6 @@ update_host()
 
 mapfile -t myarray < <(echo "$DYNV6_ZONES" | tr ',' '\n')
 
-#echo "My array:" "${myarray[@]}"
-#echo "Number of elements in the array:" "${#myarray[@]}"
-
 for current_host in "${myarray[@]}"; do
-    #echo "$current_host"
     update_host "$current_host"
 done
